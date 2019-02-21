@@ -1,0 +1,418 @@
+options {
+JDK_VERSION="1.5";
+DEBUG_PARSER=false;
+IGNORE_CASE=true;
+}
+
+PARSER_BEGIN(ETUTVL)
+
+import java.util.*;
+
+public class ETUTVL {
+
+  static List<VariableNames> variableList;
+  public static void main(String args[]) {
+    variableList = new ArrayList<VariableNames>();
+    ETUTVL parser;
+    if (args.length == 0) {
+      System.out.println("ETU TVL Language Version 1.0:  Reading from standard input . . .");
+      parser = new ETUTVL(System.in);
+    } else if (args.length == 1) {
+      System.out.println("ETU TVL Language Version 1.0:  Reading from file " + args[0] + " . . .");
+      try {
+        parser = new ETUTVL(new java.io.FileInputStream(args[0]));
+      } catch (java.io.FileNotFoundException e) {
+        System.out.println("ETU TVL Language Version 1.0:  File " + args[0] + " not found.");
+        return;
+      }
+    } else {
+      System.out.println("ETU TVL Language Version 1.0:  Usage is one of:");
+      System.out.println("         ETU TVL Language < inputfile");
+      System.out.println("OR");
+      System.out.println("         ETU TVL Language inputfile");
+      return;
+    }
+    try {
+      parser.CompilationUnit();
+      System.out.println("ETU TVL Language Version 1.0:  Program parsed successfully.");
+    } catch (ParseException e) {
+      System.out.println("ETU TVL Language Version 1.0:  Encountered errors during parse.");
+    }
+  }
+
+}
+
+class VariableNames {
+  String name;
+  String value;
+  static int vCount=0;
+  public VariableNames(String name, String value){
+    this.name=name;
+    this.value = value;
+    vCount++;
+  }
+  public String getName()
+  {
+    return this.name;
+  }
+  public String getValue()
+  {
+    return this.value;
+  }
+}
+
+
+PARSER_END(ETUTVL)
+
+SKIP : /* WHITE SPACE */
+{
+  " "
+| "\t"
+| "\n"
+| "\r"
+| "\f"
+}
+
+SPECIAL_TOKEN : /* COMMENTS */
+{
+  <SINGLE_LINE_COMMENT: "--" (~["\n", "\r"])* ("\n" | "\r" | "\r\n")?>
+}
+
+TOKEN : /* RESERVED WORDS AND LITERALS */
+{
+  < PROGRAM: "PROGRAM" >
+| < TRUE: "TRUE" >
+| < FALSE: "FALSE" >
+| < UNKNOWN: "UNKNOWN" >
+| < DECLARATION: "DECLARATION" >
+| < INITIALIZATION: "INITIALIZATION" >
+| < MAIN: "MAIN" >
+| < SECTION: "SECTION" >
+| < INPUT: "INPUT" >
+| < OUTPUT: "OUTPUT" > 
+}
+
+TOKEN : /* MESSAGES */
+{
+  < MESSAGE:
+    "'"
+    (   (~["\'","\"","\\","\n","\r"])
+      | ("\\"
+          ( ["n","t","b","r","f","\\","\"","\'"]
+          | ["0"-"7"] ( ["0"-"7"] )?
+          | ["0"-"3"] ["0"-"7"] ["0"-"7"]
+          )
+        )
+    )*
+    "'"
+  >
+}
+
+TOKEN : /* SEPARATORS */
+{
+  < LPAREN: "(" >
+| < RPAREN: ")" >
+| < SEMICOLON: ";" >
+}
+
+TOKEN : /* OPERATORS */
+{
+  < ASSIGN: "=" >
+| < AND: "AND" >
+| < OR: "OR" >
+| < NOT: "NOT" > 
+| < GT: ">" >
+| < LT: "<" >
+}
+
+TOKEN : /* IDENTIFIERS */
+{
+  < ID: <LETTER> (<LETTER_OR_DIGIT>)* >
+|
+  < #LETTER:
+      [  // A letter
+         "A"-"Z",
+         "a"-"z"
+      ]
+  >
+|
+  < #LETTER_OR_DIGIT:
+      [  // Followed by any number of letters or digits
+         "0"-"9",
+         "A"-"Z",
+         "a"-"z"
+      ]
+  >
+}
+
+
+/**********************************************
+ * THE ETU TVL Language GRAMMAR STARTS HERE *
+ *********************************************/
+
+/*
+ * Program structuring syntax follows.
+ */
+
+void CompilationUnit() :
+{}
+{
+  {System.out.println("");}
+  (ProgramNameDeclaration() )
+  ( DeclarationSection() )
+  ( InitializationSection() )
+  ( MainSection() )
+  <EOF>
+}
+
+void ProgramNameDeclaration() :
+{}
+{
+  ("PROGRAM" <ID> ";")
+}
+
+void DeclarationSection() :
+{}
+{
+  ("DECLARATION SECTION")
+  ( VariableNameList() ";" )*
+}
+
+void VariableNameList() : 
+{String res;}
+{
+  res=VariableName(){
+    for (VariableNames vn:variableList) {
+      if (vn.getName().equals(res)) {
+        System.out.println("Duplicate variable Error!");
+        System.exit(-1); 
+      }
+    }
+    variableList.add(new VariableNames(res,"UNKNOWN"));
+  } ("," res=VariableName(){
+      for (VariableNames vn:variableList) {
+        if (vn.getName().equals(res)) {
+          System.out.println("Duplicate variable Error!");
+          System.exit(-1); 
+        }
+      }
+      variableList.add(new VariableNames(res,"UNKNOWN"));
+    })* 
+}
+
+String VariableName() : 
+{Token t;}
+{
+  t=<ID> {return t.image;}
+}
+
+String LogicalValue() :
+{}
+{
+  <TRUE> {return "TRUE";} | <FALSE> {return "FALSE";} | <UNKNOWN> {return "UNKNOWN";}
+}
+
+void InitializationSection() :
+{}
+{
+  ("INITIALIZATION SECTION")
+  (InitList() ";")*
+}
+
+void InitList() :
+{String res, x;int index=0;Boolean notFount=true;}
+{
+  (res=VariableName() "=" x=LogicalValue() {
+    for (VariableNames vn:variableList) {
+      if (vn.getName().equals(res)) {
+        vn.value = x;
+        variableList.set(index, vn);
+        notFount=false;
+        break;
+      }
+      index++;
+    }
+    if (notFount) {
+      System.out.println("\nVariable "+res+" Not Fount! Dont initialization!\nPLease define in DECLARATION SECTION!");
+      System.exit(-1);
+    }
+  })
+}
+
+void MainSection() :
+{}
+{
+  ("MAIN SECTION")
+  (Statement() ";")*
+}
+
+void Statement() : 
+{}
+{
+  InputStmt() | OutputStmt() | BoolAssignmentStmt()
+}
+
+void InputStmt() : 
+{Token t; String res, inp="";int index=0;Boolean notFount=true;Scanner sc= new Scanner(System.in);}
+{
+  <INPUT> t=<MESSAGE> res=VariableName() {
+    for (VariableNames vn:variableList) {
+      if (vn.getName().equals(res)) {
+        System.out.print(t.image.substring(1,(t.image.length()-1)));
+        while(!inp.equals("TRUE") && !inp.equals("FALSE") && !inp.equals("UNKNOWN")){
+          inp = sc.nextLine();
+          if (!inp.equals("TRUE") && !inp.equals("FALSE") && !inp.equals("UNKNOWN")) {
+            System.out.println("Enter only TRUE,FALSE and UNKNOWN\n");
+            System.out.print(t.image.substring(1,(t.image.length()-1)));
+          }
+        }
+        vn.value = inp;
+        variableList.set(index, vn);
+        notFount=false;
+        break;
+      }
+      index++;
+    }
+    if (notFount) {
+      System.out.println("\nVariable "+res+" Not Fount! Dont use InputStmt!\nPLease define in DECLARATION SECTION!");
+      System.exit(-1);
+    }
+  }
+}
+
+void OutputStmt() : 
+{Token t; String res="", out;int index=0;Boolean notFount=true;}
+{
+  <OUTPUT> t=<MESSAGE> res=BoolExpression() {
+    System.out.println(t.image.substring(1,(t.image.length()-1))+res);
+  }
+}
+
+void BoolAssignmentStmt() : 
+{String name, res;int index=0;Boolean notFount=true;}
+{
+  name=VariableName() "=" res=BoolExpression() {
+    for (VariableNames vn:variableList) {
+      if (vn.getName().equals(name)) {
+        vn.value = res;
+        variableList.set(index, vn);
+        notFount=false;
+        break;
+      }
+      index++;
+    }
+    if (notFount) {
+      System.out.println("\nVariable "+name+" Not Fount! Dont BoolAssignmentStmt!\nPLease define in DECLARATION SECTION!");
+      System.exit(-1);
+    }
+  }
+}
+
+String BoolExpression() : 
+{String res, x;}
+{
+  LOOKAHEAD(2147483647)x=BoolTerm()<OR>res=BoolExpression() {
+    if (res==x) {
+      res=res;
+    }else if (res.equals("TRUE") || x.equals("TRUE"))
+    {
+      res = "TRUE";
+    }else if (res.equals("UNKNOWN") && x.equals("FALSE"))
+    {
+      res = "UNKNOWN";
+    }else if (res.equals("FALSE") && x.equals("UNKNOWN")) 
+    {
+      res = "UNKNOWN";
+    }else if (res.equals("UNKNOWN") && x.equals("UNKNOWN")) 
+    {
+      res = "UNKNOWN";
+    }
+    return res;
+  } 
+  |res=BoolTerm() {
+    return res;
+  }
+  
+}
+
+String BoolTerm() : 
+{String res, x;}
+{
+  LOOKAHEAD(2147483647)x=BoolFactor()<AND>res=BoolTerm(){
+    if (res == x) {
+      res = res;
+    }else if (res.equals("FALSE") || x.equals("FALSE"))
+    {
+      res = "FALSE";
+    }else if (res.equals("UNKNOWN") && x.equals("FALSE")) 
+    {
+      res = "FALSE";
+    }else if (res.equals("FALSE") && x.equals("UNKNOWN")) 
+    {
+      res = "FALSE";
+    }else if (res.equals("UNKNOWN") && x.equals("TRUE")) 
+    {
+      res = "UNKNOWN";
+    }else if (res.equals("TRUE") && x.equals("UNKNOWN")) 
+    {
+      res = "UNKNOWN";
+    }
+    return res;
+  } 
+  |res= BoolFactor(){
+    return res;
+  }
+}
+
+String BoolFactor() : 
+{String res, x; int index=0;Boolean notFount=true;}
+{
+  <NOT>res=BoolPrimary(){
+    if (!res.equals("TRUE") && !res.equals("FALSE") && !res.equals("UNKNOWN")) {
+      for (VariableNames vn:variableList) {
+        if (vn.getName().equals(res)) {
+          res = vn.value;
+          notFount =false;
+          break;
+        }
+        index++;
+      }
+      if (notFount) {
+        System.out.println("\nVariable "+res+" Not Fount! PLease define in DECLARATION SECTION!");
+        System.exit(-1);
+      }
+    }
+    if (res.equals("TRUE")) {
+      res = "FALSE";
+    }else if (res.equals("FALSE"))
+    {
+      res = "TRUE";
+    }else{
+       res = "UNKNOWN";
+    }
+    return res;
+  } 
+  |res=BoolPrimary(){
+    if (!res.equals("TRUE") && !res.equals("FALSE") && !res.equals("UNKNOWN")) {
+      for (VariableNames vn:variableList) {
+        if (vn.getName().equals(res)) {
+          res = vn.value;
+          notFount =false;
+          break;
+        }
+        index++;
+      }
+      if (notFount) {
+        System.out.println("\nVariable "+res+" Not Fount! PLease define in DECLARATION SECTION!");
+        System.exit(-1);
+      }
+    }
+    return res;
+  } 
+}
+
+String BoolPrimary() : 
+{String res; }
+{
+  res=LogicalValue() {return res;}| res=VariableName() {return res;}| "("res=BoolExpression()")" {return res;}
+}
