@@ -15,6 +15,6 @@ Projenin detayları Assignment.pdf içerisinde mevcuttur.</p>
 cd src
 javacc ETUTVL.jj
 javac *.java
-java ETUTVL example.tx
+java ETUTVL example.txt
 
 ```
